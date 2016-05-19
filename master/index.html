@@ -1,0 +1,184 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Singhal Algorithm</title>
+      <script src="/js/jquery.min.js"></script>    
+      <script src="/socket.io/socket.io.js"></script> 
+      <script>  
+            var socket = io();   
+            $('form').submit(function(){
+                socket.emit('chat message', $('#m').val());
+                return false;
+            });
+
+            socket.on('SystemState', function(msg){
+                $('#messages').append($('<li>').text(msg));
+            });
+          
+            socket.on('UpdateNumberOfClients', function(msg){
+               UpdateNumberOfClientsWith(msg);
+            });
+          
+            socket.on('UpdateStateMatrix', function(msg){
+               
+            });
+          
+            socket.on('GlobalStateMatrixPartial', function(msg){
+                 UpdateStatePartialMatrixWith(msg);
+            });
+          
+           socket.on('GlobalStateMatrixComplete', function(msg){
+                 UpdateStateMatrixWith(msg);
+            });
+          
+            $( document ).ready(function() {
+                
+                $( "#updateClients" ).click(function() {
+                    socket.emit('BrowserClient', "GetTotalNumberOfClients");
+                });
+                
+                $( "#requestStateMatrix" ).click(function() {
+                    socket.emit('BrowserClient', "CreateGlobalStateMatrix");
+                });
+
+                
+                $( "#jobschedule" ).click(function() {
+                    var job= {};
+                    job.client = $( "#jobclient" ).val();
+                    job.time = $( "#jobtime" ).val();
+                    job.resource = [1,2,3];
+                    console.log(job);
+                    socket.emit('ScheduleJob', job);
+                });
+            });
+          
+          
+           function UpdateStateMatrixWith(data){
+           
+               if(data.length>0){
+                   var sz =data[0].length;
+                   var tableHeader = ["Site #"];
+                   for(var k =0;k<sz-1;k++){
+                       tableHeader.push(k+1);
+                   }
+               
+                   var finalData = [];
+                   finalData.push(tableHeader);
+                   
+                   for (var i =0; i<data.length; i++){
+                       finalData.push(data[i]);
+                   }
+                   $("#SateMatrix" ).html(arrayToTable(finalData));
+                   
+               }
+          }
+          
+          function UpdateStatePartialMatrixWith(data){
+               //console.log(data);
+               $( "#SateMatrix" ).html(data);
+          }
+          
+          function UpdateNumberOfClientsWith(data){
+              console.log(data);
+              $( "#numberOfClients" ).html(data);
+          }
+          
+          function ScheduleJobAt(){
+              
+          }
+
+      </script>
+  </head>
+    <body>
+        <h1>Singhal Algorithm</h1>
+        <div id="stateMatrix" >
+
+        </div>
+        
+        <div id="updateClients">
+            <button>Update Clients</button>
+            <div id="numberOfClients">
+            </div>
+        </div>
+        
+        <div >
+            <p>Schedule Job On Site</p>
+            <input id="jobclient" value="1" />
+            <br>
+             <p>Duration</p>
+            <input  id="jobtime" value="5" />
+            <br>
+            <button id="jobschedule">Schedule Job</button>
+        </div>
+        
+        <div id="requestStateMatrix">
+            <button>Request State Matrix</button>
+        </div>
+         <div id="SateMatrix">
+             
+        </div>
+    </body>
+    <script>
+    
+       var arrayToTable = function (data, options) {
+
+    "use strict";
+
+    var table = $('<table />'),
+        thead,
+        tfoot,
+        rows = [],
+        row,
+        i,
+        j,
+        defaults = {
+            th: true, // should we use th elemenst for the first row
+            thead: false, //should we incldue a thead element with the first row
+            tfoot: false, // should we include a tfoot element with the last row
+            attrs: {} // attributes for the table element, can be used to
+        };
+
+    options = $.extend(defaults, options);
+
+    table.attr(options.attrs);
+
+    // loop through all the rows, we will deal with tfoot and thead later
+    for (i = 0; i < data.length; i = i + 1) {
+        row = $('<tr />');
+        for (j = 0; j < data[i].length; j = j + 1) {
+            if (i === 0 && options.th) {
+                row.append($('<th />').html(data[i][j]));
+            } else {
+                row.append($('<td />').html(data[i][j]));
+            }
+        }
+        rows.push(row);
+    }
+
+    // if we want a thead use shift to get it
+    if (options.thead) {
+        thead = rows.shift();
+        thead = $('<thead />').append(thead);
+        table.append(thead);
+    }
+
+    // if we want a tfoot then pop it off for later use
+    if (options.tfoot) {
+        tfoot = rows.pop();
+    }
+
+    // add all the rows
+    for (i = 0; i < rows.length; i = i + 1) {
+        table.append(rows[i]);
+    }
+
+    // and finally add the footer if needed
+    if (options.tfoot) {
+        tfoot = $('<tfoot />').append(tfoot);
+        table.append(tfoot);
+    }
+
+    return table;
+};
+    </script>
+</html>
