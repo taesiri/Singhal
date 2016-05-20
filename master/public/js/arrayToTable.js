@@ -2,7 +2,7 @@ var arrayToTable = function (data, options) {
 
     "use strict";
 
-    var table = $('<table />'),
+    var table = $('<table class=\"table table-hover table-bordered\" />'),
         thead,
         tfoot,
         rows = [],

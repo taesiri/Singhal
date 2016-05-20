@@ -1,13 +1,32 @@
 <!doctype html>
 <html>
   <head>
-    <title>Singhal Algorithm</title>
+      <title>Singhal Algorithm</title>
       <script src="/js/jquery.min.js"></script>    
+      <script src="/js/arrayToTable.js"></script>   
       <script src="/socket.io/socket.io.js"></script> 
-      <link rel="stylesheet" href="css/bootstrap.min.css" crossorigin="anonymous">
-      <link rel="stylesheet" href="css/bootstrap-theme.min.css">
-      <script src="js/bootstrap.min.js" crossorigin="anonymous"></script>    
-      
+      <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
+      <meta name="description" content="">
+      <meta name="author" content="">
+      <!--        <link rel="icon" href="../../favicon.ico">-->
+      <!-- Bootstrap core CSS -->
+      <link href="/css/bootstrap.min.css" rel="stylesheet">
+      <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+      <link href="/css/ie10-viewport-bug-workaround.css" rel="stylesheet">
+      <!-- Custom styles for this template -->
+      <link href="/css/grid.css" rel="stylesheet">
+      <!-- Just for debugging purposes. Don't actually copy these 2 lines! -->
+      <!--[if lt IE 9]><script src="/js/ie8-responsive-file-warning.js"></script><![endif]-->
+      <script src="/js/ie-emulation-modes-warning.js"></script>
+      <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+      <!--[if lt IE 9]>
+          <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+          <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+      <![endif]-->
+    
       <script>  
             var socket = io();   
             $('form').submit(function(){
@@ -84,7 +103,7 @@
           
           function UpdateNumberOfClientsWith(data){
               console.log(data);
-              $( "#numberOfClients" ).html(data);
+              $( "#numberOfClients" ).html("Number of Clients: " + data);
           }
           
           function ScheduleJobAt(){
@@ -94,102 +113,69 @@
       </script>
   </head>
     <body>
-        <h1>Singhal Algorithm</h1>
-        <div id="stateMatrix" >
+        
+        <div class="container">
 
-        </div>
-        
-        <div id="updateClients">
-            <button>Update Clients</button>
-            <div id="numberOfClients">
+          <div class="page-header">
+            <h1>Singhal Algorithm</h1>
+            <p class="lead">Distributed Mutual Exclusion Algorithm</p>
+          </div>
+
+
+            <div id="stateMatrix" >
+
             </div>
-        </div>
+            
+            <div id="updateClients" class="row">
+
+                <div class=".col-xs-8"> 
+                     <div id="numberOfClients" >
+                        <p>Number of Clients: UKNOWN!</p>
+                    </div>
+                    <button class="btn btn-default btn-sm" >
+                      <span class="glyphicon glyphicon-refresh" aria-hidden="true"></span>
+                    </button>
+                </div>
+
+            </div>
         
-        <div >
-            <p>Schedule Job On Site</p>
-            <input id="jobclient" value="1" />
-            <br>
-             <p>Duration</p>
-            <input  id="jobtime" value="5" />
-            <br>
-            <button id="jobschedule">Schedule Job</button>
-        </div>
+            <hr>
         
-      
+            <h3>Schedule Job</h3>
+                <p >Schedule Job on Clients</p> 
+            
+            
+            <table class="table table-hover"> 
+                <thead> <tr> <th>#</th> <th>Client ID</th> <th>Job Duration</th> <th>Resourcers</th> <th></th>  </tr> </thead>
+                <tbody>
+                    <tr> 
+                        <th scope="row">1</th> 
+                        <td>     <input id="jobclient" value="1" />   </td> <td> <input  id="jobtime" value="5" /> </td> 
+                        <td> <input id="resources" value="1" /> </td>
+                    <td> <button id="jobschedule" class="btn btn-default" >Schedule Job</button> </td> </tr> <tr>  
+                    </tr> 
+                </tbody> 
+            </table>
+        
+        <hr>
         
         <div id="requestStateMatrix">
-            <button>Request State Matrix</button>
+            <button class="btn btn-default">Request State Matrix</button>
         </div>
-         <div id="SateMatrix">
+        <br>
+        <div id="SateMatrix">
              
         </div>
-        
-        
-        
+            
+            
+            
+            
 
+    </div> <!-- /container -->
         
+        
+        
+        
+        <script src="/js/ie10-viewport-bug-workaround.js"></script>
     </body>
-    <script>
-    
-       var arrayToTable = function (data, options) {
-
-    "use strict";
-
-    var table = $('<table class=\"table table-hover table-bordered\" />'),
-        thead,
-        tfoot,
-        rows = [],
-        row,
-        i,
-        j,
-        defaults = {
-            th: true, // should we use th elemenst for the first row
-            thead: false, //should we incldue a thead element with the first row
-            tfoot: false, // should we include a tfoot element with the last row
-            attrs: {} // attributes for the table element, can be used to
-        };
-
-    options = $.extend(defaults, options);
-
-    table.attr(options.attrs);
-
-    // loop through all the rows, we will deal with tfoot and thead later
-    for (i = 0; i < data.length; i = i + 1) {
-        row = $('<tr />');
-        for (j = 0; j < data[i].length; j = j + 1) {
-            if (i === 0 && options.th) {
-                row.append($('<th />').html(data[i][j]));
-            } else {
-                row.append($('<td />').html(data[i][j]));
-            }
-        }
-        rows.push(row);
-    }
-
-    // if we want a thead use shift to get it
-    if (options.thead) {
-        thead = rows.shift();
-        thead = $('<thead />').append(thead);
-        table.append(thead);
-    }
-
-    // if we want a tfoot then pop it off for later use
-    if (options.tfoot) {
-        tfoot = rows.pop();
-    }
-
-    // add all the rows
-    for (i = 0; i < rows.length; i = i + 1) {
-        table.append(rows[i]);
-    }
-
-    // and finally add the footer if needed
-    if (options.tfoot) {
-        tfoot = $('<tfoot />').append(tfoot);
-        table.append(tfoot);
-    }
-
-    return table;
-};
-    </script>
 </html>
