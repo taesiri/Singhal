@@ -29,6 +29,9 @@ var slaveHasToken = false;
 
 var jobQ = [];
 
+var IsIdle = true;
+var WaitForToken = false;
+
 OnConnect = function (data) {
     RegsiterOnCoordinator();
 }
@@ -45,7 +48,6 @@ OnRequest = function(data){
             Sv[senderId] = States.R;
             break;
         case States.R:
-            
             if(Sv[senderId] != States.R){
                 // TODO : Send a Fwd Request to  (J,SNj[j]);
             } else {
@@ -70,18 +72,193 @@ OnStateMatrixRequested  = function(data) {
     slave.emit('StateMatrix', {'id' : slaveId, "matrix": Sv});
 }
 
-OnExecuteJobRequested = function(data) {
-    
-}
-
 OnJobSchedule = function(data) {
-    jobQ.push(data);
+    AddToJobQueue(data);
     console.log(data);
 }
 
-function RegsiterOnCoordinator() {
-    slave.emit('RegisterSite', slaveId);
+
+function AddToJobQueue(job){
+    jobQ.push(job);
+    // At the moment dont Schedule more than one job at a time!
+    if(IsIdle== true) {
+       RunJob();
+    }
 }
+
+function RemoveFinishedJob(){
+    // Decide to Forward Token or run another job!
+    console.log("RemoveFinishedJob");
+    updatToken();
+    IsIdle = true;
+    jobQ.splice(0,1);
+    forwardToken();
+    
+    setTimeout(function(){
+        //Recalim token for Remaining jobs!
+        RunJob();
+    }, 1500);
+}
+
+
+function RunJob() {
+    if(jobQ.length<=0){
+        return;
+    }
+    
+    var currentJob = jobQ[0];
+    var jobTime = currentJob.time;
+    
+    IsIdle = false;
+    
+    if(Sv[slaveId] == States.H){
+        // Have Token Ready to Go!
+        CriticalSection(jobTime);
+       
+    } else {
+        WaitForToken = true;
+        RequestToken();
+    }
+    
+}
+
+function CriticalSection(jobtime) {
+    Sv[slaveId] = States.E;
+    console.log("Executing CS");
+    console.log(jobtime);
+    setTimeout(function(){
+        Sv[slaveId] = States.N;
+        token.TSv[slaveId] = States.N;
+         
+        RemoveFinishedJob(); 
+       
+    }, jobtime*1000);
+}
+
+function forwardToken() {
+    // TODO : Check who needs token, then frwd token to it!
+    console.log("Forwarding Token");
+    
+    var requestings = Sv.filter(function(elem, index, array) {
+                        return elem == States.R && index!=slaveId;
+    });
+    
+    console.log(requestings);
+    // TODO : if no one wants Token set state to 'Holding'
+    
+    if(requestings.length == 0) {
+        Sv[slaveId] = States.H;
+        console.log("Token will remains here!");
+        return;
+    }
+    
+    var SnSvPair = [];
+    for(var i=0; i< Sv.length ; i++){
+        if(i!=slaveId){
+            var item = {};
+            item.Sv = Sv[i];
+            item.Sn = Sn[i];
+            item.id = i;
+            SnSvPair.push(item);
+        }
+    }
+    
+    SnSvPair.sort(function(itemA,itemB) {
+        if(itemA.Sn < itemB.Sn){
+            return -1;
+        } else if (itemA.Sn > itemB.Sn) {
+            return 1;
+        } else {
+            return 0;
+        }
+    });
+    
+    for(var i=0; i< SnSvPair.length ; i++){
+       if(SnSvPair[i].Sv == States.R){
+           
+           // SEND TOKEN TO THIS
+           console.log("Forward Token to " + SnSvPair[i].id);
+           SendToken(SnSvPair[i].id);
+           
+           break;
+       }
+    }
+    
+}
+
+
+function RequestToken() {
+    console.log("Requesting Token");
+    // Requesting Token
+    Sv[slaveId] = States.R;
+    Sn[slaveId] += 1;
+    
+    for(var i=1;i<slaveId; i++){
+        if(Sv[i] == States.R){
+            SendRequest(i);
+        }
+    }
+}
+
+function SendRequest(target) {
+    var message={};
+    message.source = slaveId;
+    message.target = target;
+    message.sn = Sn[slaveId];
+    
+    slave.emit("RequestToken", message);
+}
+
+function SendToken(target){
+    var message={};
+    message.source = slaveId;
+    message.target = target;
+    message.TSn = token.TSn;
+    message.TSv = token.TSv;
+    
+    slave.emit("ForwardToken", message);
+}
+
+OnTokenReuqested = function(requestMessage) {
+    var sender = requestMessage.source;
+    
+    if ( Sn[sender] > requestMessage.sn ){
+        //Do Nothing
+        return;
+    } else {
+        
+        Sv[sender] = States.R;
+        Sn[sender] = requestMessage.sn;
+        
+        if(Sv[slaveId]== States.H && IsIdle){
+            // ? Immediate forward!
+            SendToken(sender);
+            Sv[slaveId]== States.N;
+        }
+    }
+}
+
+OnTokenReceievd = function(rToken) {
+    // TODO : Check TokenID;
+    // We assume this is the correct token! (maybe WRONG!)
+
+    token.TSn = rToken.TSn;
+    token.TSv = rToken.TSv;
+    
+    if(WaitForToken) {
+        WaitForToken = false;
+        Sv[slaveId] = States.H
+        RunJob();
+    } else if(Sv[slaveId] == States.R){
+        Sv[slaveId] = States.H
+        RunJob();
+    } else if (IsIdle) {
+        // Does this matters?
+//        Sv[slaveId] = States.H
+//        RunJob();
+    }
+}
+
 
 function updatToken(id) {
     
@@ -125,69 +302,6 @@ function updatToken(id) {
     }
 }
 
-function forwardToken(id) {
-    
-    
-}
-
-
-function RequestToken(id) {
-    
-    // Requesting Token
-    Sv[slaveId] = States.R;
-    Sn[slaveId] += 1;
-    for(var i=1;i<slaveId; i++){
-        if(Sv[i] == States.R){
-            SendRequest(i);
-        }
-    }
-}
-
-
-function SendRequest(target){
-    var message={};
-    message.target = target;
-    message.body =  "Gimme the Token!";
-    
-    slave.emit("Request", message);
-}
-
-function RunJob() {
-    if(Sv[slaveId] == States.H){
-        // Have Token Ready to Go!
-        
-        CriticalSection();
-    } else {
-        RequessToken();
-        
-        //BLOCK! Wait for Token receieve event
-    }
-    
-    //RequestToken!
-    //if have token go to CS
-    CriticalSection();
-}
-
-function OnReceiveToken(id) {
-    
-}
-
-function CriticalSection(id) {
-    //BEFORE CS
-    Sv[slaveId] = States.E;
-    
-    
-    //ACTUAL CS
-    
-    //AFTER CS
-    
-    Sv[slaveId] = States.N;
-    token.TSv[i] = States.N;
-    
-    updatToken(id);
-    forwardToken(id);
-}
-
 
 
 function initializeToken() {
@@ -213,6 +327,8 @@ function initializeSlave(id, n) {
     slave.on('connect', OnConnect);
     slave.on('GetStateMatrix', OnStateMatrixRequested);
     slave.on('ScheduleJob', OnJobSchedule);
+    slave.on('TokenReuqested', OnTokenReuqested);
+    slave.on('TokenReceievd', OnTokenReceievd);
     
     for(var i = 1; i<=n; i++) {
         Sn[i]=0;
@@ -230,6 +346,12 @@ function initializeSlave(id, n) {
         initializeToken();
     }
 }
+
+
+function RegsiterOnCoordinator() {
+    slave.emit('RegisterSite', slaveId);
+}
+
 
 prompt.start();
 

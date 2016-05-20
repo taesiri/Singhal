@@ -20,9 +20,6 @@ app.get('/', function(req, res){
       res.sendFile(__dirname  +'/index.html');
 });
 
-OnRequest = function (data) {
-    
-}
 
 OnPartialStateMatrixReceievd = function(data) {
 
@@ -68,8 +65,6 @@ OnConnection = function(socket){
     console.log('Client Connected!');
     clients.push(socket);
     
-    socket.on('Request', OnRequest);
-    
     socket.on('StateMatrix', OnPartialStateMatrixReceievd);
     
     socket.on('BrowserClient',function(msg){
@@ -77,10 +72,14 @@ OnConnection = function(socket){
         onBrowser(msg, socket)
     });
     
-      socket.on('ScheduleJob',function(msg){
+    socket.on('ScheduleJob',function(msg){
         console.log(msg);
         onScheduleJob(msg, socket)
     })
+    
+    socket.on('RequestToken', onRequestToken);
+    
+    socket.on('ForwardToken', onForwardToken);
     
     socket.on('disconnect', function() {
         clients.splice(clients.indexOf(socket), 1);
@@ -121,14 +120,41 @@ onBrowser = function(data, browserClient){
 
 
 onScheduleJob = function(data, browserClient){
-    console.log('onScheduleJob1' + data);
-    console.log('onScheduleJob2' + data);
-    console.log('onScheduleJob3' + data);
+    console.log('onScheduleJob' + data);
     for(var i=0, n=sites.length; i<n;i++){
         if(sites[i].id == data.client){
             
             console.log('jobSceduled!');
             sites[i].socket.emit('ScheduleJob', data);
+            
+            return;
+        }
+    }
+}
+
+
+onRequestToken = function(requestMessage) {
+    console.log('TokenReuqested form: ' + requestMessage.source + "  , target :" + requestMessage.target);
+    for(var i=0, n=sites.length; i<n;i++){
+        if(sites[i].id == requestMessage.target){
+            
+            console.log('Forwarding Request Token message to : ', requestMessage.target);
+            console.log(sites[i]);
+            sites[i].socket.emit('TokenReuqested', requestMessage);
+            
+            
+            return;
+        }
+    }
+}
+
+onForwardToken = function(tokenData) {
+    console.log('TokenReceived form' + tokenData.source + "  , target :" + tokenData.target);
+    for(var i=0, n=sites.length; i<n;i++){
+        if(sites[i].id == tokenData.target){
+            
+            console.log('Forwarding Token to :', tokenData.target);
+            sites[i].socket.emit('TokenReceievd', tokenData);
             
             return;
         }

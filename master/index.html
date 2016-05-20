@@ -4,6 +4,10 @@
     <title>Singhal Algorithm</title>
       <script src="/js/jquery.min.js"></script>    
       <script src="/socket.io/socket.io.js"></script> 
+      <link rel="stylesheet" href="css/bootstrap.min.css" crossorigin="anonymous">
+      <link rel="stylesheet" href="css/bootstrap-theme.min.css">
+      <script src="js/bootstrap.min.js" crossorigin="anonymous"></script>    
+      
       <script>  
             var socket = io();   
             $('form').submit(function(){
@@ -111,12 +115,19 @@
             <button id="jobschedule">Schedule Job</button>
         </div>
         
+      
+        
         <div id="requestStateMatrix">
             <button>Request State Matrix</button>
         </div>
          <div id="SateMatrix">
              
         </div>
+        
+        
+        
+
+        
     </body>
     <script>
     
@@ -124,7 +135,7 @@
 
     "use strict";
 
-    var table = $('<table />'),
+    var table = $('<table class=\"table table-hover table-bordered\" />'),
         thead,
         tfoot,
         rows = [],
