@@ -139,9 +139,7 @@ onRequestToken = function(requestMessage) {
         if(sites[i].id == requestMessage.target){
             
             console.log('Forwarding Request Token message to : ', requestMessage.target);
-            console.log(sites[i]);
             sites[i].socket.emit('TokenReuqested', requestMessage);
-            
             
             return;
         }

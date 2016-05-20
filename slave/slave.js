@@ -81,7 +81,7 @@ OnJobSchedule = function(data) {
 function AddToJobQueue(job){
     jobQ.push(job);
     // At the moment dont Schedule more than one job at a time!
-    if(IsIdle== true) {
+    if(IsIdle == true) {
        RunJob();
     }
 }
@@ -90,14 +90,18 @@ function RemoveFinishedJob(){
     // Decide to Forward Token or run another job!
     console.log("RemoveFinishedJob");
     updatToken();
-    IsIdle = true;
+    var isTokenForwarded = forwardToken();
     jobQ.splice(0,1);
-    forwardToken();
+    IsIdle = true;
     
-    setTimeout(function(){
-        //Recalim token for Remaining jobs!
+    if (!isTokenForwarded &&  jobQ.length>0 ){
+        console.log('Since no body wants the token, i will re-enter to the CS');
         RunJob();
-    }, 1500);
+    } else if (isTokenForwarded &&  jobQ.length>0 ){
+        setTimeout(function(){
+            RunJob();
+        }, 500);
+    }
 }
 
 
@@ -106,10 +110,10 @@ function RunJob() {
         return;
     }
     
+    IsIdle = false;
+    
     var currentJob = jobQ[0];
     var jobTime = currentJob.time;
-    
-    IsIdle = false;
     
     if(Sv[slaveId] == States.H){
         // Have Token Ready to Go!
@@ -143,13 +147,10 @@ function forwardToken() {
                         return elem == States.R && index!=slaveId;
     });
     
-    console.log(requestings);
-    // TODO : if no one wants Token set state to 'Holding'
-    
     if(requestings.length == 0) {
         Sv[slaveId] = States.H;
         console.log("Token will remains here!");
-        return;
+        return false;
     }
     
     var SnSvPair = [];
@@ -176,26 +177,31 @@ function forwardToken() {
     for(var i=0; i< SnSvPair.length ; i++){
        if(SnSvPair[i].Sv == States.R){
            
-           // SEND TOKEN TO THIS
            console.log("Forward Token to " + SnSvPair[i].id);
+           
+           Sv[SnSvPair[i].id] = States.R;
+           
            SendToken(SnSvPair[i].id);
            
            break;
        }
     }
     
+    return true;
+    
 }
 
 
 function RequestToken() {
-    console.log("Requesting Token");
+    console.log("Requesting Token " + Sv);
     // Requesting Token
     Sv[slaveId] = States.R;
     Sn[slaveId] += 1;
     
-    for(var i=1;i<slaveId; i++){
-        if(Sv[i] == States.R){
+    for(var i=1;i<Sv.length; i++){
+        if(Sv[i] == States.R && i != slaveId){
             SendRequest(i);
+            console.log("Requesting Token from: " + i);
         }
     }
 }
