@@ -50,8 +50,12 @@
                  UpdateStatePartialMatrixWith(msg);
             });
           
-           socket.on('GlobalStateMatrixComplete', function(msg){
+            socket.on('GlobalStateMatrixComplete', function(msg){
                  UpdateStateMatrixWith(msg);
+            });
+          
+            socket.on('GlobalLog', function(msg){
+                 UpdateLogdataWith(msg);
             });
           
             $( document ).ready(function() {
@@ -64,6 +68,9 @@
                     socket.emit('BrowserClient', "CreateGlobalStateMatrix");
                 });
 
+                $( "#globalLog" ).click(function() {
+                    socket.emit('BrowserClient', "GetGlobalLog");
+                });
                 
                 $( "#jobschedule" ).click(function() {
                     var job= {};
@@ -102,12 +109,12 @@
           }
           
           function UpdateNumberOfClientsWith(data){
-              console.log(data);
               $( "#numberOfClients" ).html("Number of Clients: " + data);
           }
           
-          function ScheduleJobAt(){
-              
+          function UpdateLogdataWith(data){
+              console.log()
+              $( "#logData" ).val(data);
           }
 
       </script>
@@ -159,6 +166,7 @@
         
         <hr>
         
+        <h3>State Matrix</h3>
         <div id="requestStateMatrix">
             <button class="btn btn-default">Request State Matrix</button>
         </div>
@@ -167,10 +175,20 @@
              
         </div>
             
+        <hr>
             
+            <h3>Server LOG</h3>
+            <div id="globalLog">
+                <button class="btn btn-default btn-sm" >
+                      <span class="glyphicon glyphicon-refresh" aria-hidden="true"></span>
+                    </button>
+                
+                <div >
+                    <textarea readonly id="logData"  class="form-control" rows="30" >
+                    </textarea>
+                </div>
+            </div>
             
-            
-
     </div> <!-- /container -->
         
         

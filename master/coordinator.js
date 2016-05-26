@@ -14,6 +14,8 @@ var tmp_gsm = [];
 var tmp_rsm = [];
 var tmp_browserClient;
 
+var globalLog = "";
+
 app.use(express.static('public'));
 
 app.get('/', function(req, res){
@@ -32,7 +34,7 @@ OnPartialStateMatrixReceievd = function(data) {
     }
     
     if(found==-1){
-        console.log("Not Found!");        
+        console.log("Something went wrong!");        
         return;
     }
 
@@ -62,18 +64,16 @@ OnPartialStateMatrixReceievd = function(data) {
 
 
 OnConnection = function(socket){
-    console.log('Client Connected!');
+    doLog('Client Connected!');
     clients.push(socket);
     
     socket.on('StateMatrix', OnPartialStateMatrixReceievd);
     
     socket.on('BrowserClient',function(msg){
-        console.log(msg);
         onBrowser(msg, socket)
     });
     
     socket.on('ScheduleJob',function(msg){
-        console.log(msg);
         onScheduleJob(msg, socket)
     })
     
@@ -88,7 +88,7 @@ OnConnection = function(socket){
     socket.on('RegisterSite', function(siteName){
         for(var i=0; i<sites.length ; i++){
             if(sites[i].id == siteName){
-                console.log("Client id already exist, updating the Socket!");
+                doLog("Client id already exist, updating the Socket!");
                 sites[i].socket = socket;
                 return;
             }
@@ -112,7 +112,9 @@ onBrowser = function(data, browserClient){
             CreateGlobalStateMatrix();
             tmp_browserClient = browserClient;
             break;
-            
+        case "GetGlobalLog":
+            browserClient.emit("GlobalLog", globalLog);
+            break;
         default:
             break;       
     }
@@ -120,11 +122,11 @@ onBrowser = function(data, browserClient){
 
 
 onScheduleJob = function(data, browserClient){
-    console.log('onScheduleJob' + data);
+    doLog('onScheduleJob' + data);
     for(var i=0, n=sites.length; i<n;i++){
         if(sites[i].id == data.client){
             
-            console.log('jobSceduled!');
+            doLog('jobSceduled!');
             sites[i].socket.emit('ScheduleJob', data);
             
             return;
@@ -134,11 +136,11 @@ onScheduleJob = function(data, browserClient){
 
 
 onRequestToken = function(requestMessage) {
-    console.log('TokenReuqested form: ' + requestMessage.source + "  , target :" + requestMessage.target);
+    doLog('TokenReuqested form: ' + requestMessage.source + "  , target :" + requestMessage.target);
     for(var i=0, n=sites.length; i<n;i++){
         if(sites[i].id == requestMessage.target){
             
-            console.log('Forwarding Request Token message to : ', requestMessage.target);
+            doLog('Forwarding Request Token message to : ', requestMessage.target);
             sites[i].socket.emit('TokenReuqested', requestMessage);
             
             return;
@@ -147,11 +149,11 @@ onRequestToken = function(requestMessage) {
 }
 
 onForwardToken = function(tokenData) {
-    console.log('TokenReceived form' + tokenData.source + "  , target :" + tokenData.target);
+    doLog('TokenReceived form' + tokenData.source + "  , target :" + tokenData.target);
     for(var i=0, n=sites.length; i<n;i++){
         if(sites[i].id == tokenData.target){
             
-            console.log('Forwarding Token to :', tokenData.target);
+            doLog('Forwarding Token to :', tokenData.target);
             sites[i].socket.emit('TokenReceievd', tokenData);
             
             return;
@@ -171,50 +173,14 @@ function CreateGlobalStateMatrix(){
     }
 }
 
+
+function doLog(message) {
+    console.log(message);
+    globalLog += message + '\n';
+}
+
 io.on('connection', OnConnection);
 
 http.listen(5000, function(){
-  console.log('listening on *:5000');
+  doLog('listening on *:5000');
 });
-
-//function sendMessageTofirstClient(){
-//    console.log('sendeting to first user\n');
-//    clients[0].emit('fromServer', 'a message sent from server!');
-//}
-//
-//function sendMessageTosecondClient(){
-//    console.log('sendeting to second user\n');
-//    clients[1].emit('fromServer' , 'a message sent from server!');
-//}
-//
-//function gatherStateMatrix(){
-//    lastState = [];
-//    for(var i=0; i<clients.length; i++){
-//        clients[i].emit('GetStateMatrix','');
-//    }
-//}
-
-//
-//var stdin = process.openStdin();
-//
-//stdin.addListener("data", function(d) {
-//    
-//    switch(d.toString().trim()){
-//        case 'users':
-//            printUsers();
-//            break;
-//        case 'rooms':
-//            printRooms();
-//            break;
-//        case 'sendtofirst':
-//            sendMessageTofirstClient();
-//            break;
-//        case 'sendtosecond':
-//            sendMessageTosecondClient();
-//            break;
-//        case 'statematrix':
-//            gatherStateMatrix();
-//            break;
-//    }
-//    
-//});
