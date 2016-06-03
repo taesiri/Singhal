@@ -76,30 +76,58 @@
                     var job= {};
                     job.client = $( "#jobclient" ).val();
                     job.time = $( "#jobtime" ).val();
-                    job.resource = [1,2,3];
-                    console.log(job);
+                    job.resources =  $( "#resources" ).val().split(',');
+                    
+                    for (var i in job.resources) {
+                        job.resources[i] = parseInt(job.resources[i], 10);
+                    }
+                    
+                    console.log( job.resources );
                     socket.emit('ScheduleJob', job);
                 });
             });
           
           
-           function UpdateStateMatrixWith(data){
-           
+           function UpdateStateMatrixWith(data){ 
                if(data.length>0){
-                   var sz =data[0].length;
-                   var tableHeader = ["Site #"];
-                   for(var k =0;k<sz-1;k++){
-                       tableHeader.push(k+1);
-                   }
-               
-                   var finalData = [];
-                   finalData.push(tableHeader);
+                   $("#SateMatrix" ).html("");
                    
-                   for (var i =0; i<data.length; i++){
-                       finalData.push(data[i]);
-                   }
-                   $("#SateMatrix" ).html(arrayToTable(finalData));
+                   var numberOfResource = data[0].length-1;
+                   for(var r =1; r<=numberOfResource; r++){
                    
+                   
+                       var sz = data[0][1].length;
+
+                       var tableHeader = ["Site #"];
+                       for(var k =0;k<sz-1;k++){
+                           tableHeader.push(k+1);
+                       }
+
+                       var finalData = [];
+                       finalData.push(tableHeader);
+
+                           for (var i =0; i<data.length; i++){
+                               var ndata = data[i][r];
+                               ndata[0] = data[i][0];
+                              
+                               
+                               var reformattedArray = ndata.map(function(state, index){
+                                   if (index==0) return state;
+                                   if (state == 0) return 'H';
+                                   if (state == 1) return 'R';
+                                   if (state == 2) return 'E';
+                                   if (state == 3) return 'N';
+                                   return 'Err';
+                                });
+
+                               finalData.push(reformattedArray);
+                              
+                           }
+                       
+                         $("#SateMatrix" ).append("<p> Resource ID: " +  r  + "</p>");
+                         $("#SateMatrix" ).append(arrayToTable(finalData));
+
+                   } 
                }
           }
           

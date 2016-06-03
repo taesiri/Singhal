@@ -45,6 +45,8 @@ OnPartialStateMatrixReceievd = function(data) {
     
     var row = data['matrix'];
     
+    //console.log("row ", row);
+    
     for(var i =1 ;i<row.length; i++){
         item.push(row[i]);
     }
@@ -59,6 +61,8 @@ OnPartialStateMatrixReceievd = function(data) {
         tmp_browserClient.emit('GlobalStateMatrixComplete', tmp_table);
         tmp_gsm = [];
     }
+    
+    //console.log("item " ,item);
     
 }
 
@@ -122,7 +126,7 @@ onBrowser = function(data, browserClient){
 
 
 onScheduleJob = function(data, browserClient){
-    doLog('onScheduleJob' + data);
+    doLog('onScheduleJob ' + data);
     for(var i=0, n=sites.length; i<n;i++){
         if(sites[i].id == data.client){
             
@@ -136,7 +140,7 @@ onScheduleJob = function(data, browserClient){
 
 
 onRequestToken = function(requestMessage) {
-    doLog('TokenReuqested form: ' + requestMessage.source + "  , target :" + requestMessage.target);
+    doLog('Token Requesteted from: ' + requestMessage.source + "  , target :" + requestMessage.target);
     for(var i=0, n=sites.length; i<n;i++){
         if(sites[i].id == requestMessage.target){
             
@@ -149,7 +153,7 @@ onRequestToken = function(requestMessage) {
 }
 
 onForwardToken = function(tokenData) {
-    doLog('TokenReceived form' + tokenData.source + "  , target :" + tokenData.target);
+    doLog('TokenReceived from' + tokenData.source + "  , target :" + tokenData.target);
     for(var i=0, n=sites.length; i<n;i++){
         if(sites[i].id == tokenData.target){
             
@@ -165,7 +169,6 @@ function CreateGlobalStateMatrix(){
     tmp_rsm = [];
     tmp_table = [];
     tmp_gsm = [];
-
     
     for(var i=0; i<sites.length; i++) {
         sites[i].socket.emit("GetStateMatrix","-1");

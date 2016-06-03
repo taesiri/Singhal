@@ -15,61 +15,28 @@ var States = {
     N: 3
 };
 
-var token = {
-    TSv: [],
-    TSn: []
-};
+var tokensInSite = [];
+var tokens = [];
 
-var Sv=[];
-var Sn=[];
+var Sv=[[],[]];
+var Sn=[[],[]];
+
 var slaveId;
 var slave;
 var totalSites;
-var slaveHasToken = false;
 
 var jobQ = [];
 
 var IsIdle = true;
-var WaitForToken = false;
+
+var numberOfResources=1;
 
 OnConnect = function (data) {
     RegsiterOnCoordinator();
 }
 
-OnRequest = function(data){
-    var senderId = data['sender'];
-    var sequenceNumber = data['sn'];
-    
-    if(sequenceNumber<Sn[senderId])
-        return;
-    
-    switch(Sv[slaveId]){
-        case States.N:
-            Sv[senderId] = States.R;
-            break;
-        case States.R:
-            if(Sv[senderId] != States.R){
-                // TODO : Send a Fwd Request to  (J,SNj[j]);
-            } else {
-                // DO Nothing!
-            }
-            break;
-        case States.E:
-            Sv[senderId] = States.R;
-            break;
-        case States.H:
-            Sv[senderId] = States.R;
-            
-            token.TSn[senderId] = sequenceNumber;
-            
-            // TODO : Send token to sender of request!
-            break;
-    }
-}
-
-
-OnStateMatrixRequested  = function(data) {
-    slave.emit('StateMatrix', {'id' : slaveId, "matrix": Sv});
+OnStateMatrixRequested = function(data) {
+    slave.emit('StateMatrix', {'id' : slaveId, "matrix": Sv, "resources" : numberOfResources});
 }
 
 OnJobSchedule = function(data) {
@@ -77,8 +44,7 @@ OnJobSchedule = function(data) {
     console.log(data);
 }
 
-
-function AddToJobQueue(job){
+function AddToJobQueue(job) {
     jobQ.push(job);
     // At the moment dont Schedule more than one job at a time!
     if(IsIdle == true) {
@@ -89,15 +55,12 @@ function AddToJobQueue(job){
 function RemoveFinishedJob(){
     // Decide to Forward Token or run another job!
     console.log("RemoveFinishedJob");
-    updatToken();
-    var isTokenForwarded = forwardToken();
+    
+    updatTokens();
+    forwardTokens();
     jobQ.splice(0,1);
     IsIdle = true;
-    
-    if (!isTokenForwarded &&  jobQ.length>0 ){
-        console.log('Since no body wants the token, i will re-enter to the CS');
-        RunJob();
-    } else if (isTokenForwarded &&  jobQ.length>0 ){
+    if ( jobQ.length>0 ){
         setTimeout(function(){
             RunJob();
         }, 500);
@@ -106,251 +69,308 @@ function RemoveFinishedJob(){
 
 
 function RunJob() {
-    if(jobQ.length<=0){
-        return;
+    if(jobQ.length <= 0){
+        return  false;
     }
-    
+
     IsIdle = false;
     
     var currentJob = jobQ[0];
-    var jobTime = currentJob.time;
+    var resources = currentJob.resources;
+
+    console.log("Current job requires this resources: " + resources);
+    console.log("Tokens in this site: ", tokensInSite);
     
-    if(Sv[slaveId] == States.H){
-        // Have Token Ready to Go!
-        CriticalSection(jobTime);
-       
+    if(canEnterCS()){
+         CriticalSection(currentJob);
     } else {
-        WaitForToken = true;
-        RequestToken();
+      
+        resources.forEach(function(r){
+            RequestToken(r);
+        });
+        
+        IsIdle=true;
     }
-    
 }
 
-function CriticalSection(jobtime) {
-    Sv[slaveId] = States.E;
-    console.log("Executing CS");
-    console.log(jobtime);
-    setTimeout(function(){
-        Sv[slaveId] = States.N;
-        token.TSv[slaveId] = States.N;
-         
-        RemoveFinishedJob(); 
-       
-    }, jobtime*1000);
-}
 
-function forwardToken() {
-    // TODO : Check who needs token, then frwd token to it!
-    console.log("Forwarding Token");
+function canEnterCS(job){
     
-    var requestings = Sv.filter(function(elem, index, array) {
-                        return elem == States.R && index!=slaveId;
-    });
-    
-    if(requestings.length == 0) {
-        Sv[slaveId] = States.H;
-        console.log("Token will remains here!");
+    if(jobQ.length<=0){
         return false;
     }
     
-    var SnSvPair = [];
-    for(var i=0; i< Sv.length ; i++){
-        if(i!=slaveId){
-            var item = {};
-            item.Sv = Sv[i];
-            item.Sn = Sn[i];
-            item.id = i;
-            SnSvPair.push(item);
-        }
-    }
-    
-    SnSvPair.sort(function(itemA,itemB) {
-        if(itemA.Sn < itemB.Sn){
-            return -1;
-        } else if (itemA.Sn > itemB.Sn) {
-            return 1;
-        } else {
-            return 0;
+    // check if we have all needed tokens!
+    var currentJob = jobQ[0];
+    var resources = currentJob.resources;
+
+    var canRun = true;
+    // wrong usage of forEach!!!
+    resources.forEach(function(r){
+        if(tokensInSite.indexOf(r)==-1){
+            canRun = false;    
         }
     });
     
-    for(var i=0; i< SnSvPair.length ; i++){
-       if(SnSvPair[i].Sv == States.R){
-           
-           console.log("Forward Token to " + SnSvPair[i].id);
-           
-           Sv[SnSvPair[i].id] = States.R;
-           
-           SendToken(SnSvPair[i].id);
-           
-           break;
-       }
+    return canRun;    
+}
+
+function CriticalSection(currentJob) {
+    
+    var jobtime = currentJob.time;
+    var resources = currentJob.resources;
+
+    resources.forEach(function(r){
+       Sv[r][slaveId] = States.E; 
+    });
+    
+    console.log("Executing CS: " + jobtime);
+    
+    setTimeout(function(){
+        resources.forEach(function(r){
+            Sv[r][slaveId] = States.N;
+            tokens[r].TSv[slaveId] = States.N;
+        });
+        
+        RemoveFinishedJob(); 
+    }, jobtime*1000); 
+}
+
+function forwardTokens() {
+    // TODO : Check who needs token, then frwd token to it!
+    console.log("ForwardTokens()");
+    console.log("tokens in this site ", tokensInSite);
+    
+    var fwrdList = [];
+    
+    tokensInSite.forEach(function(r){
+        
+        console.log("running for r ", r);
+        
+        var requestings = Sv[r].filter(function(elem, index, array) {
+            return elem == States.R && index!=slaveId;
+        });
+
+        if(requestings.length == 0) {
+            Sv[r][slaveId] = States.H;
+            console.log("Token: " + r + "  will remains here!");
+            return false;
+        }
+
+        var SnSvPair = [];
+        for(var i=0; i< Sv[r].length ; i++){
+            if(i!=slaveId){
+                var item = {};
+                item.Sv = Sv[r][i];
+                item.Sn = Sn[r][i];
+                item.id = i;
+                SnSvPair.push(item);
+            }
+        }
+
+        SnSvPair.sort(function(itemA,itemB) {
+            if(itemA.Sn < itemB.Sn){
+                return -1;
+            } else if (itemA.Sn > itemB.Sn) {
+                return 1;
+            } else {
+                return 0;
+            }
+        });
+
+        for(var i=0; i < SnSvPair.length ; i++){
+           if(SnSvPair[i].Sv == States.R){
+               console.log("Forward Token " + r +  " to " + SnSvPair[i].id);
+               
+               Sv[r][SnSvPair[i].id] = States.R;
+               fwrdList.push({id:SnSvPair[i].id, rId: r});
+
+               break;
+           }
+        }
+        
+    });
+    
+    
+    for(var i=0; i < fwrdList.length; i++) {
+           //SendToken(SnSvPair[i].id , r);
+        SendToken(fwrdList[i].id, fwrdList[i].rId);
     }
     
-    return true;
     
+    return true;
 }
 
 
-function RequestToken() {
-    console.log("Requesting Token " + Sv);
-    // Requesting Token
-    Sv[slaveId] = States.R;
-    Sn[slaveId] += 1;
+function RequestToken(r) {
     
-    for(var i=1;i<Sv.length; i++){
-        if(Sv[i] == States.R && i != slaveId){
-            SendRequest(i);
+    console.log("Requesting Token " + r + " Sv: " + Sv[r]);
+    // Requesting Token
+    Sv[r][slaveId] = States.R;
+    Sn[r][slaveId] += 1;
+    
+    for(var i=1;i<Sv[r].length; i++){
+        if(Sv[r][i] == States.R && i != slaveId){
+            SendRequest(i , r);
             console.log("Requesting Token from: " + i);
         }
     }
 }
 
-function SendRequest(target) {
+function SendRequest(target, rId) {
     var message={};
     message.source = slaveId;
     message.target = target;
-    message.sn = Sn[slaveId];
-    
+    message.sn = Sn[rId][slaveId];
+    message.rId = rId;
     slave.emit("RequestToken", message);
 }
 
-function SendToken(target){
+function SendToken(target, rId){
+    console.log("Sending Token to " + target);
     var message={};
     message.source = slaveId;
     message.target = target;
-    message.TSn = token.TSn;
-    message.TSv = token.TSv;
+    message.TSn = tokens[rId].TSn;
+    message.TSv = tokens[rId].TSv;
+    message.rId = rId;
+    console.log("tokens in this site ", tokensInSite);
+    tokensInSite.splice(tokensInSite.indexOf(rId),1);
+    console.log("tokens in this site ", tokensInSite);
+    
+    Sv[rId][slaveId] = States.N;
+    Sv[rId][target] = States.R;
     
     slave.emit("ForwardToken", message);
 }
 
 OnTokenReuqested = function(requestMessage) {
+    console.log("tokens in this site ", tokensInSite);
     var sender = requestMessage.source;
+    var resourceId = requestMessage.rId;
     
-    if ( Sn[sender] > requestMessage.sn ){
+    console.log("Token Request Message from " + sender + " , Wants token " + resourceId);
+    
+    if ( Sn[resourceId][sender] > requestMessage.sn ){
         //Do Nothing
         return;
     } else {
         
-        Sv[sender] = States.R;
-        Sn[sender] = requestMessage.sn;
+        Sv[resourceId][sender] = States.R;
+        Sn[resourceId][sender] = requestMessage.sn;
         
-        if(Sv[slaveId]== States.H && IsIdle){
+        if(Sv[resourceId][slaveId]== States.H && IsIdle){
             // ? Immediate forward!
-            SendToken(sender);
-            Sv[slaveId]== States.N;
+            SendToken(sender,resourceId);
+            Sv[resourceId][slaveId]== States.N;
         }
     }
 }
 
 OnTokenReceievd = function(rToken) {
-    // TODO : Check TokenID;
-    // We assume this is the correct token! (maybe WRONG!)
-
-    token.TSn = rToken.TSn;
-    token.TSv = rToken.TSv;
+    console.log('OnTokenReceievd');
+    var rID = rToken.rId;
     
-    if(WaitForToken) {
-        WaitForToken = false;
-        Sv[slaveId] = States.H
+    tokensInSite.push(rID);
+    
+    tokens[rID].TSn = rToken.TSn;
+    tokens[rID].TSv = rToken.TSv;
+    
+    Sv[rID][slaveId] == States.H;
+    
+    if(canEnterCS()&&jobQ.length>0){
         RunJob();
-    } else if(Sv[slaveId] == States.R){
-        Sv[slaveId] = States.H
-        RunJob();
-    } else if (IsIdle) {
-        // Does this matters?
-//        Sv[slaveId] = States.H
-//        RunJob();
     }
+    
+    console.log("Tokens in Site: " + tokensInSite);
 }
 
 
-function updatToken(id) {
+function updatTokens() {
     
-    for(var i=1;i<=totalSites;i++){
-        if(Sv[i]==States.R && token.TSv[i]==States.N){
-            if(Sn[i]==token.TSn[i]) {
-                Sv[i]=States.N;
-            } else if (Sn[i] > token.TSn[i]) {
-                token.TSv[i] = States.R;
-                token.TSn[i] = Sn[i];
-            } else if (Sn[i] < token.TSn[i]) {
-                Sv[i] = States.N;
-                Sn[i] = token.TSn[i];
-            }
-        } else if(Sv[i]==States.N && token.TSv[i] == States.R){
-            if(Sn[i]==token.TSn[i]) {
-                // Cannot Occure!
-            } else if (Sn[i] > token.TSn[i]) {
-                // Cannot Occure!
-            } else if (Sn[i] < token.TSn[i]) {
-                Sv[i] = States.T;
-                Sn[i] = token.TSn[i];
-            }
-        } else if(Sv[i]==States.N && token.TSv[i] == States.N){
-            if(Sn[i]==token.TSn[i]) {
-                // Do nothing!
-            } else if (Sn[i] > token.TSn[i]) {
-                // Cannot Occure!
-            } else if (Sn[i] < token.TSn[i]) {
-                Sn[i] = token.TSn[i];
-            }
-        } else if(Sv[i]==States.R && token.TSv[i] == States.R){
-             if(Sn[i]==token.TSn[i]) {
-                // Do nothing!
-            } else if (Sn[i] > token.TSn[i]) {
-                // Cannot Occure!
-            } else if (Sn[i] < token.TSn[i]) {
-                Sn[i] = token.TSn[i];
-            }   
-        }
-    }
+    tokensInSite.forEach(function(r){
+         for(var i=1;i<=totalSites;i++){
+             
+             if(Sn[r][i] > tokens[r].TSn[i]){
+                 tokens[r].TSv[i] = Sv[r][i];
+                 tokens[r].TSn[i] = Sn[r][i];
+             } else {
+                 Sv[r][i] = tokens[r].TSv[i];
+                 Sn[r][i] = tokens[r].TSn[i];
+             }
+         }
+    });
+    
 }
 
 
 
-function initializeToken() {
+function initializeTokens() {
     
     // this code only runs on Site 1 (salve #1)
     
-    slaveHasToken = true;
+    //  dummy!
+    tokens.push({
+            TSv: [],
+            TSn: []
+        });
     
-    for(var i = 1; i<=totalSites; i++) {
-        token.TSn[i] = 0;
-        token.TSv[i] = States.N;
+    for(var r = 1; r<=numberOfResources; r++){
+        
+        tokens.push({
+            TSv: [],
+            TSn: [],
+            rId: r
+        });
+        
+        for(var i = 1; i<=totalSites; i++) {
+            tokens[r].TSn[i] = 0;
+            tokens[r].TSv[i] = States.N;
+        }
+        
+        if(slaveId==1){
+            tokensInSite.push(r);
+            Sv[r][1] = States.H;
+        } else {
+              Sv[r][1] = States.R;
+        }  
     }
-    
-    Sv[1] = States.H;
 }
 
 
-function initializeSlave(id, n) {
+function initializeSlave(id, n, r) {
     
     slaveId = id;
     slave = io.connect(socketURL, options);
-
+    numberOfResources = r;
+    
     slave.on('connect', OnConnect);
     slave.on('GetStateMatrix', OnStateMatrixRequested);
     slave.on('ScheduleJob', OnJobSchedule);
     slave.on('TokenReuqested', OnTokenReuqested);
     slave.on('TokenReceievd', OnTokenReceievd);
     
-    for(var i = 1; i<=n; i++) {
-        Sn[i]=0;
-        
-        if(i<id){
-            Sv[i]= States.R;
-        } else {
-            Sv[i] = States.N;
+    for(var r = 1; r<=numberOfResources; r++){
+         Sn[r] = [];
+         Sv[r] = [];
+         for(var i = 1; i<=n; i++) {
+             
+            Sn[r][i]=0;
+
+            if(i<id){
+                Sv[r][i]= States.R;
+            } else {
+                Sv[r][i] = States.N;
+            }
         }
     }
     
     totalSites=n;
     
-    if(id==1){
-        initializeToken();
-    }
+    
+    initializeTokens();
+   
+    console.log(tokens);
 }
 
 
@@ -361,9 +381,9 @@ function RegsiterOnCoordinator() {
 
 prompt.start();
 
-prompt.get(['id', 'n'], function (err, result) {
+prompt.get(['id', 'n', 'r'], function (err, result) {
     if (err) { return onErr(err); }    
-    initializeSlave(result.id, result.n);  
+    initializeSlave(result.id, result.n, result.r);  
 });
 
 function onErr(err) {
