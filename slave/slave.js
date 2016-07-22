@@ -1,8 +1,8 @@
 var prompt = require('prompt');
 // reset of world:
-//var io = require('socket.io-client');
+var io = require('socket.io-client');
 //on windows :
-var io = require('C:/Users/taesiri/Documents/GitHub/Singhal/master/node_modules/socket.io/node_modules/socket.io-client');
+//var io = require('C:/Users/taesiri/Documents/GitHub/Singhal/master/node_modules/socket.io/node_modules/socket.io-client');
 
 var socketURL = 'http://127.0.0.1:5000';
 

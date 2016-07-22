@@ -16,7 +16,7 @@ var tmp_gsm = [];
 var tmp_rsm = [];
 var tmp_browserClient;
 
-
+var globalStartTime=0;
 var requestMessageCounter = 0;
 var forwardTokenCounter = 0;
 var jobFinishTime = [];
@@ -29,11 +29,9 @@ app.get('/', function(req, res){
 });
 
 
-
 const output = fs.createWriteStream('./stdout.log');
 const errorOutput = fs.createWriteStream('./stderr.log');
 const myConsole = new Console(output, errorOutput);
-
 
 
 OnPartialStateMatrixReceievd = function(data) {
@@ -150,6 +148,10 @@ onBrowser = function(data, browserClient){
 
 
 onScheduleJob = function(data, browserClient){
+    if(globalStartTime==0) {
+        globalStartTime = (new Date()).getTime();
+    }
+
     myConsole.log('onScheduleJob ' + data);
     for(var i=0, n=sites.length; i<n;i++){
         if(sites[i].id == data.client){
@@ -217,7 +219,10 @@ function CreateGlobalStateMatrix(){
 function CalculateStatistics(browserClient) {
     myConsole.log("#Transmitted Messages ", requestMessageCounter + forwardTokenCounter);
     
+    if(jobFinishTime.length<=0) return;
     
+    var totalTime = jobFinishTime[jobFinishTime.length-1].finishTime - globalStartTime;
+
     var TimeArray = [];
     
     jobFinishTime.forEach(function(element, index, array) {
@@ -228,8 +233,8 @@ function CalculateStatistics(browserClient) {
                  TimeArray[elm] = [];
             }
             
-            TimeArray[elm].push({'time': element.startTime, 'event': 'start'});
-            TimeArray[elm].push({'time': element.finishTime, 'event': 'finish'});
+            TimeArray[elm].push({'time': element.startTime, 'event': 'start', 'jobId' : element.jobId});
+            TimeArray[elm].push({'time': element.finishTime, 'event': 'finish', 'jobId' : element.jobId});
             
         });
         
@@ -272,7 +277,7 @@ function CalculateStatistics(browserClient) {
 
    
     
-    var statResult = {'NumberOfRequests': requestMessageCounter , 'NumberOftokenForward': forwardTokenCounter , 'DetailedSynchTimes' : JSON.stringify(delayBetweenCSEnteranceTime) , 'jobDone' : jobFinishTime.length };
+    var statResult = {'NumberOfRequests': requestMessageCounter , 'NumberOftokenForward': forwardTokenCounter , 'DetailedSynchTimes' : JSON.stringify(delayBetweenCSEnteranceTime) , 'jobDone' : jobFinishTime.length , 'totalTime' : totalTime};
     
     browserClient.emit('UpdateStatistics', JSON.stringify(statResult) );  
 
