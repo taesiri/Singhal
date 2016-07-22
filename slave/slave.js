@@ -1,6 +1,10 @@
 var prompt = require('prompt');
-var io = require('socket.io-client');
-var socketURL = 'http://0.0.0.0:5000';
+// reset of world:
+//var io = require('socket.io-client');
+//on windows :
+var io = require('C:/Users/taesiri/Documents/GitHub/Singhal/master/node_modules/socket.io/node_modules/socket.io-client');
+
+var socketURL = 'http://127.0.0.1:5000';
 
 var options = {
   transports: ['websocket'],
@@ -94,7 +98,7 @@ function RunJob() {
 }
 
 
-function canEnterCS(job){
+function canEnterCS(){
     
     if(jobQ.length<=0){
         return false;
@@ -117,6 +121,10 @@ function canEnterCS(job){
 
 function CriticalSection(currentJob) {
     
+    var startTime = (new Date()).getTime();
+    
+    console.log(currentJob);
+
     var jobtime = currentJob.time;
     var resources = currentJob.resources;
 
@@ -127,13 +135,18 @@ function CriticalSection(currentJob) {
     console.log("Executing CS: " + jobtime);
     
     setTimeout(function(){
+
+        
+         slave.emit('JobFinished', {'id' : slaveId, 'job' : currentJob.id ,'resources' : currentJob.resources ,'startTime': startTime, 'finishTime' : (new Date()).getTime()});
+    
+
         resources.forEach(function(r){
             Sv[r][slaveId] = States.N;
             tokens[r].TSv[slaveId] = States.N;
         });
         
         RemoveFinishedJob(); 
-    }, jobtime*1000); 
+    }, jobtime); 
 }
 
 function forwardTokens() {
@@ -379,14 +392,24 @@ function RegsiterOnCoordinator() {
 }
 
 
-prompt.start();
 
-prompt.get(['id', 'n', 'r'], function (err, result) {
-    if (err) { return onErr(err); }    
-    initializeSlave(result.id, result.n, result.r);  
-});
-
-function onErr(err) {
-    console.log(err);
-    return 1;
+if(process.argv.length != 3 + 1 + 2) {
+    console.log(chalk.red("ERROR, check your input"));
+    console.log(chalk.red("Correct input: coordinatorAddress, id, n, r"));
+} else {
+    socketURL = process.argv[2];
+    initializeSlave(process.argv[3], process.argv[4], process.argv[5]); 
 }
+
+
+// prompt.start();
+
+// prompt.get(['id', 'n', 'r'], function (err, result) {
+//     if (err) { return onErr(err); }    
+//     initializeSlave(result.id, result.n, result.r);  
+// });
+
+// function onErr(err) {
+//     console.log(err);
+//     return 1;
+// }

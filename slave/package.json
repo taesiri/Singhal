@@ -1,0 +1,15 @@
+{
+  "name": "docker_raymond_slave",
+  "version": "1.0.0",
+  "description": "Raymond Slaves on Docker",
+  "author": "Mohammad Reza Taesiri (mtaesiri@gmail.com)",
+  "main": "slave.js",
+  "scripts": {
+    "start": "node slave.js"
+  },
+  "dependencies": {
+    "express": "^4.13.3",
+    "socket.io": "1.4.8",
+    "chalk" : "1.1.3"
+  }
+}

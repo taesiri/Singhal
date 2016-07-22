@@ -1,9 +1,11 @@
+const Console = require('console').Console;
+const fs = require('fs');
+
 var express = require('express');
 var app = express();
 
 var http = require('http').Server(app);
 var io = require('socket.io')(http);
-var Promise = require('promise');
 
 var sites = [];
 var clients = [];
@@ -14,13 +16,24 @@ var tmp_gsm = [];
 var tmp_rsm = [];
 var tmp_browserClient;
 
-var globalLog = "";
+
+var requestMessageCounter = 0;
+var forwardTokenCounter = 0;
+var jobFinishTime = [];
+
 
 app.use(express.static('public'));
 
 app.get('/', function(req, res){
       res.sendFile(__dirname  +'/index.html');
 });
+
+
+
+const output = fs.createWriteStream('./stdout.log');
+const errorOutput = fs.createWriteStream('./stderr.log');
+const myConsole = new Console(output, errorOutput);
+
 
 
 OnPartialStateMatrixReceievd = function(data) {
@@ -34,7 +47,7 @@ OnPartialStateMatrixReceievd = function(data) {
     }
     
     if(found==-1){
-        console.log("Something went wrong!");        
+        myConsole.log("Something went wrong!");        
         return;
     }
 
@@ -68,11 +81,13 @@ OnPartialStateMatrixReceievd = function(data) {
 
 
 OnConnection = function(socket){
-    doLog('Client Connected!');
+    myConsole.log('Client Connected!');
     clients.push(socket);
     
     socket.on('StateMatrix', OnPartialStateMatrixReceievd);
     
+    socket.on('JobFinished', onJobFinished);
+
     socket.on('BrowserClient',function(msg){
         onBrowser(msg, socket)
     });
@@ -92,7 +107,7 @@ OnConnection = function(socket){
     socket.on('RegisterSite', function(siteName){
         for(var i=0; i<sites.length ; i++){
             if(sites[i].id == siteName){
-                doLog("Client id already exist, updating the Socket!");
+                myConsole.log("Client id already exist, updating the Socket!");
                 sites[i].socket = socket;
                 return;
             }
@@ -112,12 +127,21 @@ onBrowser = function(data, browserClient){
         case "GetTotalNumberOfClients":
             browserClient.emit("UpdateNumberOfClients", sites.length);
             break;
+        case "GetStatistics":
+            CalculateStatistics(browserClient);
+            break;
         case "CreateGlobalStateMatrix":
             CreateGlobalStateMatrix();
             tmp_browserClient = browserClient;
             break;
         case "GetGlobalLog":
-            browserClient.emit("GlobalLog", globalLog);
+            
+             fs.readFile('./stdout.log', (err, data) => {
+              if (err) throw err;
+              browserClient.emit("GlobalLog", String.fromCharCode.apply(null, new Uint16Array(data)));
+            });
+            
+
             break;
         default:
             break;       
@@ -126,11 +150,11 @@ onBrowser = function(data, browserClient){
 
 
 onScheduleJob = function(data, browserClient){
-    doLog('onScheduleJob ' + data);
+    myConsole.log('onScheduleJob ' + data);
     for(var i=0, n=sites.length; i<n;i++){
         if(sites[i].id == data.client){
             
-            doLog('jobSceduled!');
+            myConsole.log('jobSceduled!');
             sites[i].socket.emit('ScheduleJob', data);
             
             return;
@@ -140,11 +164,13 @@ onScheduleJob = function(data, browserClient){
 
 
 onRequestToken = function(requestMessage) {
-    doLog('Token Requesteted from: ' + requestMessage.source + "  , target :" + requestMessage.target);
+    requestMessageCounter++; 
+
+    myConsole.log('Token Requesteted from: ' + requestMessage.source + "  , target :" + requestMessage.target);
     for(var i=0, n=sites.length; i<n;i++){
         if(sites[i].id == requestMessage.target){
             
-            doLog('Forwarding Request Token message to : ', requestMessage.target);
+            myConsole.log('Forwarding Request Token message to : ', requestMessage.target);
             sites[i].socket.emit('TokenReuqested', requestMessage);
             
             return;
@@ -153,17 +179,27 @@ onRequestToken = function(requestMessage) {
 }
 
 onForwardToken = function(tokenData) {
-    doLog('TokenReceived from' + tokenData.source + "  , target :" + tokenData.target);
+    forwardTokenCounter++; 
+
+    myConsole.log('TokenReceived from' + tokenData.source + "  , target :" + tokenData.target);
     for(var i=0, n=sites.length; i<n;i++){
         if(sites[i].id == tokenData.target){
             
-            doLog('Forwarding Token to :', tokenData.target);
+            myConsole.log('Forwarding Token to :', tokenData.target);
             sites[i].socket.emit('TokenReceievd', tokenData);
             
             return;
         }
     }
 }
+
+onJobFinished = function(data) {
+    myConsole.log(data);
+    jobFinishTime.push({'jobId': data.job, 'nodeId': data.id, 'resources': data.resources, 'startTime' : data.startTime, 'finishTime' : data.finishTime});
+    myConsole.log('Job ', data.job , ', startTime ' , data.startTime, ', finishTime ' , data.finishTime );
+    console.log(jobFinishTime.length, " jobs finished!");
+};
+
 
 function CreateGlobalStateMatrix(){
     tmp_rsm = [];
@@ -177,13 +213,75 @@ function CreateGlobalStateMatrix(){
 }
 
 
-function doLog(message) {
-    console.log(message);
-    globalLog += message + '\n';
+
+function CalculateStatistics(browserClient) {
+    myConsole.log("#Transmitted Messages ", requestMessageCounter + forwardTokenCounter);
+    
+    
+    var TimeArray = [];
+    
+    jobFinishTime.forEach(function(element, index, array) {
+       
+        element.resources.forEach(function(elm,idx,arr) {
+            
+            if(! TimeArray[elm]) {
+                 TimeArray[elm] = [];
+            }
+            
+            TimeArray[elm].push({'time': element.startTime, 'event': 'start'});
+            TimeArray[elm].push({'time': element.finishTime, 'event': 'finish'});
+            
+        });
+        
+    });
+    
+    TimeArray.forEach( function(element, index) {
+       
+        TimeArray[index] = TimeArray[index].sort(function (a ,b) {
+            return a.time - b.time;
+        });
+        
+    });
+    
+    myConsole.log(TimeArray);
+
+    delayBetweenCSEnteranceTime = [];
+    
+    TimeArray.forEach( function(element, index) {
+       
+        var deltaTimes = [];
+        var deltaSum = 0;
+        
+        for(var i=1; i<TimeArray[index].length-1; i+=2) {
+        
+            if(TimeArray[index][i].event != 'finish' || TimeArray[index][i+1].event != 'start') {
+                myConsole.log("PANIC");
+                myConsole.log(i+1, ",  ", TimeArray[index][i+1].event);
+                myConsole.log(i, ", ", TimeArray[index][i].event);
+
+                return;
+            }
+
+
+            deltaSum +=   TimeArray[index][i+1].time - TimeArray[index][i].time;
+            deltaTimes.push(TimeArray[index][i+1].time - TimeArray[index][i].time);
+        }
+        
+        delayBetweenCSEnteranceTime[index] = deltaTimes;
+    });
+
+   
+    
+    var statResult = {'NumberOfRequests': requestMessageCounter , 'NumberOftokenForward': forwardTokenCounter , 'DetailedSynchTimes' : JSON.stringify(delayBetweenCSEnteranceTime) , 'jobDone' : jobFinishTime.length };
+    
+    browserClient.emit('UpdateStatistics', JSON.stringify(statResult) );  
+
 }
+
+
 
 io.on('connection', OnConnection);
 
 http.listen(5000, function(){
-  doLog('listening on *:5000');
+  myConsole.log('listening on *:5000');
 });

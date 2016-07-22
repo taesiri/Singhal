@@ -53,7 +53,11 @@
             socket.on('GlobalStateMatrixComplete', function(msg){
                  UpdateStateMatrixWith(msg);
             });
-          
+                      
+            socket.on('UpdateStatistics', function(msg){
+               UpdateStatisticsWith(msg);
+            });
+            
             socket.on('GlobalLog', function(msg){
                  UpdateLogdataWith(msg);
             });
@@ -71,6 +75,10 @@
                 $( "#globalLog" ).click(function() {
                     socket.emit('BrowserClient', "GetGlobalLog");
                 });
+
+                $( "#statistics" ).click(function() {
+                    socket.emit('BrowserClient', "GetStatistics");
+                });
                 
                 $( "#jobschedule" ).click(function() {
                     var job= {};
@@ -85,6 +93,40 @@
                     console.log( job.resources );
                     socket.emit('ScheduleJob', job);
                 });
+
+
+                $( "#jobscheduleCombo" ).click(function() {
+                    
+                    var arrayOfLines = $('#jobsCombo').val().split('\n');
+
+                    arrayOfLines.forEach(function(element, index, array){
+                        
+                        console.log(element);
+                        
+                        var job= {};
+                        
+                        var splitOnDots = element.split(':');
+
+                        job.id = parseInt(splitOnDots[0], 10);
+                        job.client = parseInt(splitOnDots[1], 10);
+                        job.time = parseInt(splitOnDots[2], 10);
+                        
+                        job.resources =  splitOnDots[3].split('#');
+                    
+                        for (var i in job.resources) {
+                            job.resources[i] = parseInt(job.resources[i], 10);
+                        }
+                        
+                        console.log(job);
+                        
+                        socket.emit('ScheduleJob', job);
+
+                    });
+                    
+                    
+                });
+
+
             });
           
           
@@ -139,6 +181,10 @@
           function UpdateNumberOfClientsWith(data){
               $( "#numberOfClients" ).html("Number of Clients: " + data);
           }
+
+          function UpdateStatisticsWith(data) {
+              $( "#statisticsData" ).html(data);
+          }
           
           function UpdateLogdataWith(data){
               console.log()
@@ -191,6 +237,16 @@
                     </tr> 
                 </tbody> 
             </table>
+
+
+            <p >Combo Schedule</p> 
+             
+            
+            <div>
+                <textarea id="jobsCombo" class="form-control" rows="10" ></textarea>
+            </div>
+            
+            <button id="jobscheduleCombo" class="btn btn-default" >Schedule Job</button> 
         
         <hr>
         
@@ -204,6 +260,22 @@
         </div>
             
         <hr>
+
+<h3>Algorithm Statistics</h3>
+            <div id="statistics">
+                <button class="btn btn-default btn-sm" >
+                    <span class="glyphicon glyphicon-refresh" aria-hidden="true"></span>
+                    </button>
+                
+                <div >
+                    <textarea readonly id="statisticsData"  class="form-control" rows="5" >
+                    </textarea>
+                </div>
+            </div>
+
+
+
+        <hr>
             
             <h3>Server LOG</h3>
             <div id="globalLog">
@@ -212,7 +284,7 @@
                     </button>
                 
                 <div >
-                    <textarea readonly id="logData"  class="form-control" rows="30" >
+                    <textarea readonly id="logData"  class="form-control" rows="5" >
                     </textarea>
                 </div>
             </div>

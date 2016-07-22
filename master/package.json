@@ -1,0 +1,14 @@
+{
+  "name": "docker_singhal_coordinator",
+  "version": "1.0.0",
+  "description": "Singhal Coordinator on Docker",
+  "author": "Mohammad Reza Taesiri (mtaesiri@gmail.com)",
+  "main": "coordinator.js",
+  "scripts": {
+    "start": "node coordinator.js"
+  },
+  "dependencies": {
+    "express": "^4.13.3",
+    "socket.io": "1.4.8"
+  }
+}
