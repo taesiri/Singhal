@@ -87,7 +87,7 @@
                     job.resources =  $( "#resources" ).val().split(',');
                     
                     for (var i in job.resources) {
-                        job.resources[i] = parseInt(job.resources[i], 10);
+                        job.resources[i] = parseInt(job.resources[i], 10) + 1;
                     }
                     
                     console.log( job.resources );
@@ -114,7 +114,7 @@
                         job.resources =  splitOnDots[3].split('#');
                     
                         for (var i in job.resources) {
-                            job.resources[i] = parseInt(job.resources[i], 10);
+                            job.resources[i] = parseInt(job.resources[i], 10) + 1;
                         }
                         
                         console.log(job);

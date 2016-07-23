@@ -41,6 +41,16 @@ OnConnect = function (data) {
 
 OnStateMatrixRequested = function(data) {
     slave.emit('StateMatrix', {'id' : slaveId, "matrix": Sv, "resources" : numberOfResources});
+    console.log('tokens in site: ' , tokensInSite);
+   
+    if(jobQ.length>0){
+
+        var currentJob = jobQ[0];
+        var resources = currentJob.resources;
+        console.log("for job " , currentJob.id, " need these: ", resources);
+    }
+
+     console.log(Sv);
 }
 
 OnJobSchedule = function(data) {
@@ -73,6 +83,7 @@ function RemoveFinishedJob(){
 
 
 function RunJob() {
+    console.log("Trying to run a job!");
     if(jobQ.length <= 0){
         return  false;
     }
@@ -99,7 +110,7 @@ function RunJob() {
 
 
 function canEnterCS(){
-    
+    console.log("Cant enter CS?");
     if(jobQ.length<=0){
         return false;
     }
@@ -120,11 +131,9 @@ function canEnterCS(){
 }
 
 function CriticalSection(currentJob) {
-    
+    console.log("Executing CS ", currentJob);
     var startTime = (new Date()).getTime();
     
-    console.log(currentJob);
-
     var jobtime = currentJob.time;
     var resources = currentJob.resources;
 
@@ -136,9 +145,7 @@ function CriticalSection(currentJob) {
     
     setTimeout(function(){
 
-        
-         slave.emit('JobFinished', {'id' : slaveId, 'job' : currentJob.id ,'resources' : currentJob.resources ,'startTime': startTime, 'finishTime' : (new Date()).getTime()});
-    
+         slave.emit('JobFinished', {'id' : slaveId, 'job' : currentJob.id ,'resources' : currentJob.resources ,'startTime': startTime, 'finishTime' : (new Date()).getTime()});    
 
         resources.forEach(function(r){
             Sv[r][slaveId] = States.N;
@@ -231,6 +238,11 @@ function RequestToken(r) {
 }
 
 function SendRequest(target, rId) {
+
+    if(tokensInSite.indexOf(rId)>=0){
+        console.log("PANIC!!!!!");
+    }
+
     var message={};
     message.source = slaveId;
     message.target = target;
@@ -275,7 +287,7 @@ OnTokenReuqested = function(requestMessage) {
         if(Sv[resourceId][slaveId]== States.H && IsIdle){
             // ? Immediate forward!
             SendToken(sender,resourceId);
-            Sv[resourceId][slaveId]== States.N;
+            Sv[resourceId][slaveId]= States.N;
         }
     }
 }
@@ -289,8 +301,12 @@ OnTokenReceievd = function(rToken) {
     tokens[rID].TSn = rToken.TSn;
     tokens[rID].TSv = rToken.TSv;
     
-    Sv[rID][slaveId] == States.H;
-    
+    console.log("Holding token: ", rID, Sv[rID][slaveId]);
+    Sv[rID][slaveId] = States.H;
+    console.log(Sv[rID]);
+
+
+
     if(canEnterCS()&&jobQ.length>0){
         RunJob();
     }
@@ -300,7 +316,7 @@ OnTokenReceievd = function(rToken) {
 
 
 function updatTokens() {
-    
+    console.log("updatTokens");
     tokensInSite.forEach(function(r){
          for(var i=1;i<=totalSites;i++){
              
@@ -313,16 +329,11 @@ function updatTokens() {
              }
          }
     });
-    
 }
 
 
-
 function initializeTokens() {
-    
-    // this code only runs on Site 1 (salve #1)
-    
-    //  dummy!
+
     tokens.push({
             TSv: [],
             TSn: []
@@ -379,19 +390,13 @@ function initializeSlave(id, n, r) {
     }
     
     totalSites=n;
-    
-    
     initializeTokens();
-   
     console.log(tokens);
 }
-
 
 function RegsiterOnCoordinator() {
     slave.emit('RegisterSite', slaveId);
 }
-
-
 
 if(process.argv.length != 3 + 1 + 2) {
     console.log(chalk.red("ERROR, check your input"));
@@ -401,15 +406,3 @@ if(process.argv.length != 3 + 1 + 2) {
     initializeSlave(process.argv[3], process.argv[4], process.argv[5]); 
 }
 
-
-// prompt.start();
-
-// prompt.get(['id', 'n', 'r'], function (err, result) {
-//     if (err) { return onErr(err); }    
-//     initializeSlave(result.id, result.n, result.r);  
-// });
-
-// function onErr(err) {
-//     console.log(err);
-//     return 1;
-// }

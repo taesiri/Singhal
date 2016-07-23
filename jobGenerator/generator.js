@@ -12,16 +12,16 @@ Array.prototype.getUnique = function(){
 }
 
 
-for (var i = 1; i<5; i++) {
+for (var i = 1; i<101; i++) {
   var nodeId = Math.round(getRandom(1,3));
   var jobTime = Math.round(getRandom(1,100)) * 10;
 
  // var resources = Math.round(getRandom(1,5));
 
   var resources = [] ;
-  resources.push(Math.round(getRandom(1,5)));
-  resources.push(Math.round(getRandom(1,5)));
-  resources.push(Math.round(getRandom(1,5)));
+  resources.push(Math.round(getRandom(0,4)));
+  resources.push(Math.round(getRandom(0,4)));
+  resources.push(Math.round(getRandom(0,4)));
 
 
   console.log(i + ":" + nodeId + ":" + jobTime + ":" + resources.getUnique().join("#") );
