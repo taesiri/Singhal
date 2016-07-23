@@ -67,7 +67,7 @@ function RemoveFinishedJob(){
     if ( jobQ.length>0 ){
         setTimeout(function(){
             RunJob();
-        }, 500);
+        }, 1);
     }
 }
 
